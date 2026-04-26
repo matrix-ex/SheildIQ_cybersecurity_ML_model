@@ -1,13 +1,15 @@
 import { Link, useLocation } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  Activity, 
-  Target, 
-  Cpu, 
-  History, 
-  Settings, 
-  ShieldCheck
+import {
+  LayoutDashboard,
+  Activity,
+  Target,
+  Cpu,
+  History,
+  Settings,
+  ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
+import AlertsBadge from "./AlertsBadge";
 
 export default function Sidebar() {
   const location = useLocation();
@@ -17,6 +19,7 @@ export default function Sidebar() {
     { to: "/predict", label: "Prediction", icon: <Target size={20} /> },
     { to: "/models", label: "Models", icon: <Cpu size={20} /> },
     { to: "/history", label: "Logs", icon: <History size={20} /> },
+    { to: "/alerts", label: "Alerts", icon: <ShieldAlert size={20} />, hasBadge: true },
   ];
 
   return (
@@ -38,8 +41,8 @@ export default function Sidebar() {
               key={link.to}
               to={link.to}
               className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 group ${
-                isActive 
-                ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" 
+                isActive
+                ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
                 : "text-slate-400 hover:text-white hover:bg-white/5"
               }`}
             >
@@ -47,6 +50,7 @@ export default function Sidebar() {
                 {link.icon}
               </span>
               <span className="font-medium text-sm">{link.label}</span>
+              {link.hasBadge && <AlertsBadge />}
               {isActive && (
                 <div className="ml-auto w-1 h-4 bg-blue-500 rounded-full neon-glow" />
               )}

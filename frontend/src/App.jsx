@@ -6,6 +6,7 @@ import Dashboard from "./pages/Dashboard";
 import Predict from "./pages/Predict";
 import Models from "./pages/Models";
 import History from "./pages/History";
+import AlertsPage from "./pages/AlertsPage";
 import Login from "./pages/Login";
 import { getMe } from "./services/api";
 
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/predict" element={<Predict />} />
             <Route path="/models" element={<Models />} />
             <Route path="/history" element={<History />} />
+            <Route path="/alerts" element={<AlertsPage />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>

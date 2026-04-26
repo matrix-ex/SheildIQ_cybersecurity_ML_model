@@ -301,9 +301,11 @@ def predict_batch():
 
 # ─── MAIN ────────────────────────────────────────────────────
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
     print("\n" + "=" * 50)
     print("  VAULTO ML Prediction API")
     print(f"  Models: {list(models.keys())}")
-    print("  Running on: http://localhost:5000")
+    print(f"  Running on: http://0.0.0.0:{port}")
     print("=" * 50 + "\n")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=port, debug=False)
+
