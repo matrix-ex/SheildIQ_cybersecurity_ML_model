@@ -1,0 +1,13 @@
+{
+  "0": "Normal",
+  "1": "Brute_Force",
+  "2": "Dictionary_Attack",
+  "3": "DoS",
+  "4": "DDoS",
+  "5": "SYN_Flood",
+  "6": "Port_Scan",
+  "7": "SQL_Injection",
+  "8": "XSS",
+  "9": "R2L",
+  "10": "Botnet"
+}

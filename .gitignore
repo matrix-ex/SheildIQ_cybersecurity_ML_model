@@ -1,0 +1,43 @@
+# Virtual Environment
+.venv/
+env/
+venv/
+
+# Node modules
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Environment variables
+.env
+.env.local
+
+# Build outputs
+frontend/dist/
+frontend/build/
+
+# IDE/OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Datasets
+ml/data/
+*.csv
+
+# ML Models (Large files > 100MB break GitHub pushes)
+ml/models/*.joblib
+ml/models/*.pkl
+*.pkl
+
+# PDF/Presentation files
+*.pdf
+*.pptx
+
+# Generators and Extraneous scripts
+generate_*.py
+extract_pdf.py
