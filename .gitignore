@@ -41,3 +41,12 @@ ml/models/*.pkl
 # Generators and Extraneous scripts
 generate_*.py
 extract_pdf.py
+convert_to_docx.py
+fix_report.py
+rename_aria_to_dev.py
+viper.ps1
+
+# Reports
+*.docx
+*.md
+!README.md
