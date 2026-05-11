@@ -16,41 +16,31 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-/**
- * Full analysis pipeline: features → ML prediction → prevention action → alert
- */
-export const analyzeTraffic = (payload) =>
-  api.post("/api/analyze", payload);
+export const analyzeTraffic = (payload, config = {}) => api.post("/api/analyze", payload, config);
 
-/**
- * Fetch alerts with optional filters
- * @param {object} filters - { status, severity, limit }
- */
 export const getAlerts = (filters = {}) => {
   const params = new URLSearchParams();
-  if (filters.status) params.append("status", filters.status);
-  if (filters.severity) params.append("severity", filters.severity);
-  if (filters.limit) params.append("limit", filters.limit);
-  return api.get(`/api/alerts?${params.toString()}`);
+  if (filters.status && filters.status !== "all") {
+    params.append("status", filters.status);
+  }
+  if (filters.severity && filters.severity !== "all") {
+    params.append("severity", filters.severity);
+  }
+  if (filters.triggered_by && filters.triggered_by !== "all") {
+    params.append("triggered_by", filters.triggered_by);
+  }
+  if (filters.limit) {
+    params.append("limit", String(filters.limit));
+  }
+
+  const query = params.toString();
+  return api.get(query ? `/api/alerts?${query}` : "/api/alerts");
 };
 
-/**
- * Get aggregated alert statistics for dashboard
- */
-export const getAlertStats = () =>
-  api.get("/api/alerts/stats");
+export const getAlertStats = () => api.get("/api/alerts/stats");
 
-/**
- * Triage an alert (mitigate or dismiss)
- * @param {string} id - Alert MongoDB _id
- * @param {object} payload - { status: "mitigated"|"dismissed", triaged_by: "admin" }
- */
-export const triageAlert = (id, payload) =>
-  api.patch(`/api/alerts/${id}/triage`, payload);
+export const triageAlert = (id, payload) => api.patch(`/api/alerts/${id}/triage`, payload);
 
-/**
- * Hard delete an alert (demo reset)
- * @param {string} id - Alert MongoDB _id
- */
-export const deleteAlert = (id) =>
-  api.delete(`/api/alerts/${id}`);
+export const deleteAlert = (id) => api.delete(`/api/alerts/${id}`);
+
+export default api;

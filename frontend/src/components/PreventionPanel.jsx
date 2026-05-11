@@ -1,173 +1,117 @@
-import { useState } from "react";
-import { ShieldCheck, ShieldAlert, AlertTriangle, Clock, Zap, Eye } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Clock3, AlertTriangle } from "lucide-react";
 
-const ACTION_COLORS = {
-  DROP_CONNECTION: { bg: "rgba(255,68,68,0.15)", border: "#ff4444", text: "#ff4444", label: "DROP CONNECTION" },
-  QUARANTINE:      { bg: "rgba(255,68,68,0.15)", border: "#ff4444", text: "#ff4444", label: "QUARANTINE" },
-  BLOCK_AND_LOG:   { bg: "rgba(255,107,53,0.15)", border: "#ff6b35", text: "#ff6b35", label: "BLOCK & LOG" },
-  RATE_LIMIT:      { bg: "rgba(255,170,0,0.15)", border: "#ffaa00", text: "#ffaa00", label: "RATE LIMIT" },
-  FLAG_FOR_REVIEW: { bg: "rgba(124,58,237,0.15)", border: "#7c3aed", text: "#7c3aed", label: "FLAG FOR REVIEW" },
-  ALLOW:           { bg: "rgba(0,255,136,0.15)", border: "#00ff88", text: "#00ff88", label: "ALLOW" },
+const ACTION_STYLES = {
+  ALLOW: "bg-emerald-100 text-emerald-700",
+  RATE_LIMIT: "bg-amber-100 text-amber-700",
+  DROP_CONNECTION: "bg-red-100 text-red-700",
+  BLOCK_AND_LOG: "bg-orange-100 text-orange-700",
+  QUARANTINE: "bg-red-100 text-red-700",
+  FLAG_FOR_REVIEW: "bg-slate-200 text-slate-700",
 };
 
 function formatTimeout(seconds) {
-  if (!seconds || seconds === 0) return "None";
-  const hours = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
-  if (hours > 0) return `${hours} hour${hours > 1 ? "s" : ""}`;
-  return `${mins} min${mins > 1 ? "s" : ""}`;
+  const value = Number(seconds || 0);
+  if (!value) {
+    return "0s";
+  }
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  if (hours > 0 && minutes > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  if (hours > 0) {
+    return `${hours}h`;
+  }
+  return `${minutes}m`;
 }
 
-function getConfidenceColor(conf) {
-  if (conf >= 90) return "#00ff88";
-  if (conf >= 75) return "#ffaa00";
-  return "#ff4444";
-}
+export default function PreventionPanel({ prevention, prediction, onSaveAlert, saving = false }) {
+  if (!prevention) {
+    return null;
+  }
 
-export default function PreventionPanel({ prevention, prediction, onSaveAlert, saving }) {
-  if (!prevention) return null;
+  const confidencePercent = (() => {
+    const raw = Number(prediction?.confidence || prevention?.confidence || 0);
+    return raw > 1 ? raw : raw * 100;
+  })();
 
-  const actionStyle = ACTION_COLORS[prevention.action] || ACTION_COLORS.ALLOW;
-  const confidence = prediction?.confidence || 0;
-  const isAllow = prevention.action === "ALLOW";
-  const isReview = prevention.action === "FLAG_FOR_REVIEW";
+  const attackLabel =
+    prediction?.prediction_label ||
+    prediction?.attack_name ||
+    prevention?.attack_label ||
+    "Normal";
+
+  const actionStyle = ACTION_STYLES[prevention.action] || "bg-slate-200 text-slate-700";
 
   return (
-    <div
-      className="rounded-2xl p-6 mt-6 border backdrop-blur-md transition-all duration-500 animate-fadeIn"
-      style={{
-        background: isAllow
-          ? "linear-gradient(135deg, rgba(0,255,136,0.05), rgba(0,212,255,0.03))"
-          : `linear-gradient(135deg, ${actionStyle.bg}, rgba(10,10,26,0.8))`,
-        borderColor: isAllow ? "rgba(0,255,136,0.2)" : `${actionStyle.border}33`,
-      }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+    <section className="surface-card mt-6 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          {isAllow ? (
-            <div className="p-2 rounded-lg" style={{ background: "rgba(0,255,136,0.15)" }}>
-              <ShieldCheck size={22} color="#00ff88" />
-            </div>
-          ) : isReview ? (
-            <div className="p-2 rounded-lg" style={{ background: "rgba(124,58,237,0.15)" }}>
-              <Eye size={22} color="#7c3aed" />
-            </div>
-          ) : (
-            <div className="p-2 rounded-lg" style={{ background: actionStyle.bg }}>
-              <ShieldAlert size={22} color={actionStyle.text} />
-            </div>
-          )}
+          <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+            {prevention.action === "ALLOW" ? <ShieldCheck size={18} /> : <ShieldAlert size={18} />}
+          </div>
           <div>
-            <h3 className="text-white font-bold text-lg">
-              {isAllow ? "Traffic Safe" : "Prevention Action Triggered"}
-            </h3>
-            <p className="text-slate-400 text-sm">
-              {isAllow ? "No threats detected" : prediction?.attack_name || "Unknown threat"}
-            </p>
+            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Prevention Engine</p>
+            <h3 className="text-lg font-bold text-slate-900">Action: {prevention.action}</h3>
           </div>
         </div>
-
-        {/* Action Badge */}
-        <span
-          className="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border"
-          style={{
-            background: actionStyle.bg,
-            borderColor: actionStyle.border,
-            color: actionStyle.text,
-          }}
-        >
-          {actionStyle.label}
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${actionStyle}`}>
+          {attackLabel}
         </span>
       </div>
 
-      {/* Allow → simplified green banner */}
-      {isAllow && (
-        <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: "rgba(0,255,136,0.08)" }}>
-          <ShieldCheck size={40} color="#00ff88" className="opacity-60" />
-          <div>
-            <p className="text-emerald-300 font-semibold">All Clear</p>
-            <p className="text-slate-400 text-sm">
-              This traffic pattern matches normal behavior. No prevention actions needed.
-            </p>
-          </div>
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div className="surface-card-soft p-3">
+          <p className="text-[11px] uppercase tracking-wide text-slate-500">Severity</p>
+          <p className="mt-1 text-base font-bold capitalize text-slate-900">{prevention.severity}</p>
         </div>
+        <div className="surface-card-soft p-3">
+          <p className="text-[11px] uppercase tracking-wide text-slate-500">Confidence</p>
+          <p className="mt-1 text-base font-bold text-slate-900">{confidencePercent.toFixed(1)}%</p>
+        </div>
+        <div className="surface-card-soft p-3">
+          <p className="text-[11px] uppercase tracking-wide text-slate-500">Timeout</p>
+          <p className="mt-1 inline-flex items-center gap-1 text-base font-bold text-slate-900">
+            <Clock3 size={14} />
+            {formatTimeout(prevention.timeout)}
+          </p>
+        </div>
+        <div className="surface-card-soft p-3">
+          <p className="text-[11px] uppercase tracking-wide text-slate-500">Model</p>
+          <p className="mt-1 text-base font-bold text-slate-900">{prediction?.model_used || "XGBoost"}</p>
+        </div>
+      </div>
+
+      <div className="surface-card-soft mt-4 p-3.5">
+        <p className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          <AlertTriangle size={12} /> Reason
+        </p>
+        <p className="mt-1.5 text-sm text-slate-700">{prevention.reason}</p>
+      </div>
+
+      <div className="surface-card-soft mt-4 p-3.5">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Prevention Actions Applied</p>
+        {Array.isArray(prevention.prevention_actions) && prevention.prevention_actions.length > 0 ? (
+          <ul className="mt-2 space-y-1.5 text-sm text-slate-700">
+            {prevention.prevention_actions.map((action, index) => (
+              <li key={`${action}-${index}`}>• {action}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-slate-600">No additional prevention actions required.</p>
+        )}
+      </div>
+
+      {onSaveAlert && (
+        <button
+          type="button"
+          onClick={onSaveAlert}
+          disabled={saving}
+          className="btn-primary mt-4 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {saving ? "Saving Alert..." : "Save as Alert"}
+        </button>
       )}
-
-      {/* Threat details */}
-      {!isAllow && (
-        <>
-          {/* Reason */}
-          <div className="mb-4 p-3 rounded-xl bg-white/5 border border-white/5">
-            <p className="text-slate-300 text-sm leading-relaxed">
-              <AlertTriangle size={14} className="inline mr-1 -mt-0.5" style={{ color: actionStyle.text }} />
-              {prevention.reason}
-            </p>
-          </div>
-
-          {/* Stats row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            {/* Confidence */}
-            <div className="p-3 rounded-xl bg-white/5 border border-white/5 text-center">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Confidence</p>
-              <p className="text-xl font-bold" style={{ color: getConfidenceColor(confidence) }}>
-                {confidence.toFixed(1)}%
-              </p>
-            </div>
-            {/* Severity */}
-            <div className="p-3 rounded-xl bg-white/5 border border-white/5 text-center">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Severity</p>
-              <p className="text-xl font-bold capitalize" style={{ color: actionStyle.text }}>
-                {prevention.severity}
-              </p>
-            </div>
-            {/* Timeout */}
-            <div className="p-3 rounded-xl bg-white/5 border border-white/5 text-center">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Timeout</p>
-              <p className="text-xl font-bold text-white flex items-center justify-center gap-1">
-                <Clock size={14} className="text-slate-400" />
-                {formatTimeout(prevention.timeout)}
-              </p>
-            </div>
-            {/* Model */}
-            <div className="p-3 rounded-xl bg-white/5 border border-white/5 text-center">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Model</p>
-              <p className="text-xl font-bold text-cyan-400 flex items-center justify-center gap-1">
-                <Zap size={14} />
-                {prediction?.model_used || "XGBoost"}
-              </p>
-            </div>
-          </div>
-
-          {/* Flag for Review banner */}
-          {isReview && (
-            <div className="mb-4 p-3 rounded-xl border" style={{ background: "rgba(124,58,237,0.08)", borderColor: "rgba(124,58,237,0.2)" }}>
-              <p className="text-purple-300 text-sm">
-                <Eye size={14} className="inline mr-1 -mt-0.5" />
-                Low confidence detection — this alert requires manual review before enforcement.
-              </p>
-            </div>
-          )}
-
-          {/* Save as Alert button */}
-          {onSaveAlert && (
-            <button
-              onClick={onSaveAlert}
-              disabled={saving}
-              className="w-full py-3 rounded-xl font-semibold text-sm uppercase tracking-wider transition-all duration-300 border"
-              style={{
-                background: saving ? "rgba(255,255,255,0.05)" : actionStyle.bg,
-                borderColor: saving ? "rgba(255,255,255,0.1)" : actionStyle.border,
-                color: saving ? "#94a3b8" : actionStyle.text,
-                cursor: saving ? "not-allowed" : "pointer",
-              }}
-            >
-              {saving ? "Saving..." : "✓ Alert Saved to Dashboard"}
-            </button>
-          )}
-        </>
-      )}
-    </div>
+    </section>
   );
 }

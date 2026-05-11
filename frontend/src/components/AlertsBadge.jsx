@@ -10,14 +10,8 @@ export default function AlertsBadge() {
 
   const fetchOpenAlerts = async () => {
     try {
-      const res = await getAlerts({ status: "open", limit: 1 });
-      // The response is an array; use its length or check headers
-      // But we need total count, so we fetch stats instead
-      const statsRes = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:4000"}/api/alerts/stats`
-      );
-      const stats = await statsRes.json();
-      const newCount = stats.open || 0;
+      const alertsRes = await getAlerts({ status: "open", limit: 200 });
+      const newCount = Array.isArray(alertsRes.data) ? alertsRes.data.length : 0;
 
       // Pulse if new alerts arrived
       if (newCount > prevCount.current) {
@@ -37,21 +31,23 @@ export default function AlertsBadge() {
     return () => clearInterval(interval);
   }, []);
 
-  if (count === 0) return null;
+  if (count === 0) {
+    return null;
+  }
 
   return (
     <button
       onClick={() => navigate("/alerts")}
-      className="relative p-1"
+      className="relative"
       title={`${count} open alert${count !== 1 ? "s" : ""}`}
     >
       <div
-        className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white px-1 ${
+        className={`ml-auto inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white ${
           pulse ? "animate-pulse" : ""
         }`}
         style={{
-          background: "#ff4444",
-          boxShadow: pulse ? "0 0 12px rgba(255,68,68,0.6)" : "0 0 6px rgba(255,68,68,0.3)",
+          background: "#b73b39",
+          boxShadow: pulse ? "0 0 0 3px rgba(183,59,57,0.2)" : "none",
         }}
       >
         {count > 99 ? "99+" : count}

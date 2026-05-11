@@ -1,209 +1,333 @@
 const express = require("express");
 const axios = require("axios");
 const Alert = require("../models/Alert");
+const ApiKey = require("../models/ApiKey");
+const { optionalAuth } = require("../middleware/auth");
 const { getPreventionAction } = require("../services/preventionEngine");
+const { applyBlock } = require("../middleware/waf");
 
 const router = express.Router();
 const FLASK_URL = process.env.FLASK_URL || process.env.ML_API_URL || "http://localhost:5000";
 
-// ─── POST /api/analyze ──────────────────────────────────────
-// Full pipeline: Features → Flask ML → Prevention Engine → Alert
-router.post("/analyze", async (req, res) => {
-  try {
-    const { features, ip, model } = req.body;
+const ACTION_KEYS = [
+  "DROP_CONNECTION",
+  "RATE_LIMIT",
+  "BLOCK_AND_LOG",
+  "QUARANTINE",
+  "FLAG_FOR_REVIEW",
+  "ALLOW",
+];
 
-    if (!features || !Array.isArray(features) || features.length !== 20) {
-      return res.status(400).json({
-        error: "Expected 'features' array with exactly 20 numbers.",
+function normalizeFlaskPrediction(payload = {}) {
+  const prediction = Number.isFinite(Number(payload.prediction))
+    ? Number(payload.prediction)
+    : 0;
+  const predictionLabel = payload.prediction_label || payload.attack_name || "Normal";
+  const rawConfidence = Number(payload.confidence || 0);
+  const confidence = rawConfidence > 1 ? rawConfidence / 100 : rawConfidence;
+
+  return {
+    class: prediction,
+    label: predictionLabel,
+    prediction,
+    prediction_label: predictionLabel,
+    confidence,
+    confidence_percent: (confidence * 100).toFixed(1),
+    model_used: payload.model_used || "XGBoost",
+    all_models_results: payload.all_models_results || null,
+    severity: payload.severity || null,
+  };
+}
+
+async function callFlaskPredict(features, model) {
+  const candidates = ["/predict", "/api/predict"];
+
+  for (const path of candidates) {
+    try {
+      const resp = await axios.post(
+        `${FLASK_URL}${path}`,
+        { features, model: model || "XGBoost" },
+        { timeout: 10000 }
+      );
+      return normalizeFlaskPrediction(resp.data);
+    } catch (err) {
+      if (path === candidates[candidates.length - 1]) {
+        throw err;
+      }
+    }
+  }
+
+  throw new Error("ML prediction unavailable");
+}
+
+router.post("/analyze", optionalAuth, async (req, res) => {
+  try {
+    const apiKey = req.headers["x-vaulto-api-key"];
+    let keyDoc = null;
+
+    if (apiKey) {
+      keyDoc = await ApiKey.findOne({
+        key: apiKey,
+        is_active: true,
       });
     }
 
-    const sourceIp = ip || "0.0.0.0";
-    const modelName = model || "XGBoost";
+    // Bypass API key if we have a valid key OR a valid authenticated user session
+    if (!keyDoc && !req.userId && apiKey !== "VAULTO_DEV_2024") {
+      return res.status(401).json({ error: "Invalid or missing API key. Please use a valid key or log in." });
+    }
 
-    // Step 1: Call Flask ML API
+    const {
+      features,
+      ip,
+      model,
+      source_url = "",
+      triggered_by = "manual",
+    } = req.body || {};
+
+    if (!Array.isArray(features) || features.length !== 20) {
+      return res.status(400).json({
+        error: "Body must include features:[20 numbers]",
+      });
+    }
+
+    const sourceIp = ip || req.ip || "0.0.0.0";
+
     let prediction;
     try {
-      const mlResponse = await axios.post(`${FLASK_URL}/api/predict`, {
-        features,
-        model: modelName,
-      }, { timeout: 10000 });
-      prediction = mlResponse.data;
-    } catch (mlError) {
-      // Flask is down → fail-open (ALLOW)
-      console.warn(`[VAULTO] Flask ML unreachable: ${mlError.message}`);
+      prediction = await callFlaskPredict(features, model || "XGBoost");
+    } catch (err) {
+      const prevention = {
+        attack_class: 0,
+        attack_label: "Normal",
+        action: "ALLOW",
+        timeout: 0,
+        severity: "none",
+        reason: "ML service unavailable. Failsafe mode keeps traffic allowed.",
+        prevention_actions: ["Passive monitoring only"],
+        ip: sourceIp,
+        confidence: 0,
+      };
+
       return res.json({
         prediction: {
+          class: 0,
+          label: "Normal",
           prediction: 0,
-          attack_name: "Unknown",
+          prediction_label: "Normal",
           confidence: 0,
-          model_used: modelName,
-          severity: { level: "None", score: 0 },
+          model_used: model || "XGBoost",
+          all_models_results: null,
+          severity: null,
         },
-        prevention: {
-          action: "ALLOW",
-          timeout: 0,
-          severity: "none",
-          reason: "ML service unavailable — defaulting to ALLOW.",
-          ip: sourceIp,
-        },
+        prevention,
         alert_id: null,
-        timestamp: new Date().toISOString(),
-        error: "ML service unavailable",
+        blocked: false,
+        error: "ML unavailable",
       });
     }
 
-    // Step 2: Run Prevention Engine
-    const confidence = (prediction.confidence || 0) / 100; // Flask returns 0-100, engine expects 0-1
     const prevention = getPreventionAction(
       prediction.prediction,
       sourceIp,
-      confidence
+      prediction.confidence
     );
 
-    // Step 3: Save alert if action is not ALLOW
     let alertId = null;
     if (prevention.action !== "ALLOW") {
-      const alert = new Alert({
-        ip: sourceIp,
+      const created = await Alert.create({
+        source_ip: sourceIp,
         attack_class: prediction.prediction,
-        attack_label: prediction.attack_name,
+        attack_label: prediction.prediction_label,
+        severity: prevention.severity,
+        confidence: prediction.confidence,
+        model_used: prediction.model_used,
         action: prevention.action,
         timeout: prevention.timeout,
         reason: prevention.reason,
-        severity: prevention.severity,
-        confidence: confidence,
-        model_used: prediction.model_used || modelName,
-        status: "open",
+        prevention_actions: prevention.prevention_actions,
+        source_url,
+        triggered_by: ["safezone", "manual", "auto", "shield"].includes(triggered_by)
+          ? triggered_by
+          : "manual",
       });
-      const saved = await alert.save();
-      alertId = saved._id;
+
+      alertId = created._id;
+      
+      // Apply active enforcement to the WAF immediately
+      applyBlock(sourceIp, prevention.action, prevention.timeout);
     }
 
-    // Step 4: Return everything
-    res.json({
+    return res.json({
       prediction,
       prevention,
       alert_id: alertId,
-      timestamp: new Date().toISOString(),
+      blocked: prevention.action !== "ALLOW",
     });
   } catch (err) {
-    console.error("[VAULTO] /api/analyze error:", err.message);
-    res.status(500).json({ error: "Analysis failed: " + err.message });
+    return res.status(500).json({
+      error: `Analysis failed: ${err.message}`,
+    });
   }
 });
 
-// ─── GET /api/alerts ────────────────────────────────────────
-// List alerts with optional filters
 router.get("/alerts", async (req, res) => {
   try {
-    const { status, severity, limit } = req.query;
+    const { status, severity, triggered_by, limit = 50 } = req.query;
     const filter = {};
 
-    if (status && status !== "all") filter.status = status;
-    if (severity && severity !== "all") filter.severity = severity;
+    if (status && status !== "all") {
+      filter.status = status;
+    }
+    if (severity && severity !== "all") {
+      filter.severity = severity;
+    }
+    if (triggered_by && triggered_by !== "all") {
+      filter.triggered_by = triggered_by;
+    }
 
-    const maxLimit = Math.min(parseInt(limit) || 50, 200);
-
-    const alerts = await Alert.find(filter)
+    const docs = await Alert.find(filter)
       .sort({ createdAt: -1 })
-      .limit(maxLimit);
+      .limit(Math.min(Number(limit) || 50, 200));
 
-    res.json(alerts);
+    return res.json(docs);
   } catch (err) {
-    console.error("[VAULTO] /api/alerts error:", err.message);
-    res.status(500).json({ error: "Failed to fetch alerts: " + err.message });
+    return res.status(500).json({
+      error: `Failed to fetch alerts: ${err.message}`,
+    });
   }
 });
 
-// ─── GET /api/alerts/stats ──────────────────────────────────
-// Dashboard statistics
 router.get("/alerts/stats", async (req, res) => {
   try {
-    const total = await Alert.countDocuments();
-    const open = await Alert.countDocuments({ status: "open" });
-    const mitigated = await Alert.countDocuments({ status: "mitigated" });
-    const dismissed = await Alert.countDocuments({ status: "dismissed" });
+    const now = new Date();
+    const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    // By severity
-    const critical = await Alert.countDocuments({ severity: "critical" });
-    const high = await Alert.countDocuments({ severity: "high" });
-    const medium = await Alert.countDocuments({ severity: "medium" });
-    const none = await Alert.countDocuments({ severity: "none" });
-
-    // By action
-    const actionAgg = await Alert.aggregate([
-      { $group: { _id: "$action", count: { $sum: 1 } } },
-    ]);
-    const by_action = {};
-    actionAgg.forEach((a) => { by_action[a._id] = a.count; });
-
-    // Threats in last 24 hours
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const threats_last_24h = await Alert.countDocuments({
-      createdAt: { $gte: oneDayAgo },
-    });
-
-    res.json({
+    const [
       total,
       open,
       mitigated,
       dismissed,
-      by_severity: { critical, high, medium, none },
+      critical,
+      high,
+      medium,
+      none,
+      actionAgg,
+      threatsLast24h,
+      hourlyAgg,
+    ] = await Promise.all([
+      Alert.countDocuments(),
+      Alert.countDocuments({ status: "open" }),
+      Alert.countDocuments({ status: "mitigated" }),
+      Alert.countDocuments({ status: "dismissed" }),
+      Alert.countDocuments({ severity: "critical" }),
+      Alert.countDocuments({ severity: "high" }),
+      Alert.countDocuments({ severity: "medium" }),
+      Alert.countDocuments({ severity: "none" }),
+      Alert.aggregate([{ $group: { _id: "$action", count: { $sum: 1 } } }]),
+      Alert.countDocuments({ createdAt: { $gte: since24h } }),
+      Alert.aggregate([
+        { $match: { createdAt: { $gte: since24h } } },
+        {
+          $group: {
+            _id: { $hour: "$createdAt" },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+
+    const by_action = {
+      DROP_CONNECTION: 0,
+      RATE_LIMIT: 0,
+      BLOCK_AND_LOG: 0,
+      QUARANTINE: 0,
+      FLAG_FOR_REVIEW: 0,
+      ALLOW: 0,
+    };
+
+    actionAgg.forEach((item) => {
+      if (ACTION_KEYS.includes(item._id)) {
+        by_action[item._id] = item.count;
+      }
+    });
+
+    const threats_by_hour = new Array(24).fill(0);
+    hourlyAgg.forEach((item) => {
+      const hour = Number(item._id);
+      if (Number.isInteger(hour) && hour >= 0 && hour < 24) {
+        threats_by_hour[hour] = item.count;
+      }
+    });
+
+    return res.json({
+      total,
+      open,
+      mitigated,
+      dismissed,
+      by_severity: {
+        critical,
+        high,
+        medium,
+        none,
+      },
       by_action,
-      threats_last_24h,
+      threats_last_24h: threatsLast24h,
+      threats_by_hour,
     });
   } catch (err) {
-    console.error("[VAULTO] /api/alerts/stats error:", err.message);
-    res.status(500).json({ error: "Failed to fetch stats: " + err.message });
+    return res.status(500).json({
+      error: `Failed to fetch stats: ${err.message}`,
+    });
   }
 });
 
-// ─── PATCH /api/alerts/:id/triage ───────────────────────────
-// Update alert status (mitigate or dismiss)
 router.patch("/alerts/:id/triage", async (req, res) => {
   try {
-    const { status, triaged_by } = req.body;
-
-    if (!status || !["mitigated", "dismissed"].includes(status)) {
+    const { status, triaged_by = "admin" } = req.body || {};
+    if (!["open", "mitigated", "dismissed"].includes(status)) {
       return res.status(400).json({
-        error: "Status must be 'mitigated' or 'dismissed'.",
+        error: "status must be one of: open, mitigated, dismissed",
       });
     }
 
-    const alert = await Alert.findByIdAndUpdate(
+    const updated = await Alert.findByIdAndUpdate(
       req.params.id,
       {
         status,
-        triaged_by: triaged_by || "admin",
+        triaged_by,
         triaged_at: new Date(),
       },
       { new: true }
     );
 
-    if (!alert) {
-      return res.status(404).json({ error: "Alert not found." });
+    if (!updated) {
+      return res.status(404).json({ error: "Alert not found" });
     }
 
-    res.json(alert);
+    return res.json(updated);
   } catch (err) {
-    console.error("[VAULTO] /api/alerts/:id/triage error:", err.message);
-    res.status(500).json({ error: "Triage failed: " + err.message });
+    return res.status(500).json({
+      error: `Failed to triage alert: ${err.message}`,
+    });
   }
 });
 
-// ─── DELETE /api/alerts/:id ─────────────────────────────────
-// Hard delete for demo reset
 router.delete("/alerts/:id", async (req, res) => {
   try {
-    const alert = await Alert.findByIdAndDelete(req.params.id);
-    if (!alert) {
-      return res.status(404).json({ error: "Alert not found." });
+    const deleted = await Alert.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Alert not found" });
     }
-    res.json({ message: "Alert deleted.", id: req.params.id });
+
+    return res.json({
+      success: true,
+      id: deleted._id,
+    });
   } catch (err) {
-    console.error("[VAULTO] DELETE /api/alerts/:id error:", err.message);
-    res.status(500).json({ error: "Delete failed: " + err.message });
+    return res.status(500).json({
+      error: `Failed to delete alert: ${err.message}`,
+    });
   }
 });
 

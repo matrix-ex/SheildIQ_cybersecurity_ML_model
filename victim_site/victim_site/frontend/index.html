@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Bank | Institutional Banking</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --accent: #2563eb;
+            --border: #e2e8f0;
+            --card-bg: #f8fafc;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--bg); 
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .minimal-card { 
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .minimal-card:hover {
+            border-color: #cbd5e1;
+        }
+
+        .input-minimal {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .input-minimal:focus {
+            border-color: var(--accent);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.05);
+        }
+
+        .btn-primary {
+            background: var(--text-primary);
+            color: #ffffff;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            background: #1e293b;
+        }
+
+        .btn-outline {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+        }
+
+        .btn-outline:hover {
+            background: #f1f5f9;
+            color: var(--text-primary);
+        }
+
+        .console-bg {
+            background: #0f172a;
+            color: #94a3b8;
+            border-radius: 12px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade {
+            animation: fadeIn 0.4s ease forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <!-- Navbar -->
+    <nav class="h-16 border-b border-slate-100 px-8 flex justify-between items-center bg-white sticky top-0 z-50">
+        <div class="flex items-center space-x-8">
+            <div class="flex items-center space-x-2">
+                <div class="w-6 h-6 bg-slate-900 rounded flex items-center justify-center text-white text-xs font-bold italic">N</div>
+                <span class="text-sm font-bold tracking-tight text-slate-900 uppercase">Nexus <span class="font-normal text-slate-400">Institutional</span></span>
+            </div>
+            <div class="h-4 w-px bg-slate-200"></div>
+            <div class="flex space-x-6">
+                <a href="#" id="navPersonal" class="text-xs font-semibold text-slate-900 hover:text-blue-600 transition">Dashboard</a>
+                <a href="#" id="navLab" class="text-xs font-semibold text-slate-500 hover:text-blue-600 transition">Security Lab</a>
+                <a href="#" class="text-xs font-semibold text-slate-500 hover:text-blue-600 transition">Liquidity</a>
+                <a href="#" class="text-xs font-semibold text-slate-500 hover:text-blue-600 transition">Assets</a>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Network Status: <span class="text-emerald-500">Optimal</span></span>
+            <button id="logoutBtn" class="hidden text-xs font-semibold text-red-500 hover:text-red-600">Terminate Session</button>
+        </div>
+    </nav>
+
+    <main class="flex-1 max-w-7xl mx-auto w-full p-12">
+        <!-- Login Section -->
+        <div id="loginSection" class="max-w-md mx-auto mt-24 animate-fade">
+            <div class="mb-10">
+                <h2 class="text-3xl font-bold tracking-tight text-slate-900 mb-2">Secure Gateway</h2>
+                <p class="text-slate-500 text-sm">Authorized institutional access only.</p>
+            </div>
+            
+            <form id="loginForm" class="space-y-5">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Identifier</label>
+                    <input type="text" id="username" class="w-full p-3 text-sm input-minimal" placeholder="Username" required>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Access Key</label>
+                    <input type="password" id="password" class="w-full p-3 text-sm input-minimal" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="w-full py-3 btn-primary text-sm shadow-sm">
+                    Establish Connection
+                </button>
+            </form>
+            <p id="loginError" class="text-red-500 text-xs mt-6 text-center hidden font-medium"></p>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboardSection" class="hidden space-y-12 animate-fade">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h1 class="text-4xl font-bold tracking-tight text-slate-900" id="userFullName">...</h1>
+                    <p class="text-slate-500 text-sm mt-1">Global Liquidity Portfolio</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Assets (USD)</p>
+                    <h2 id="userBalance" class="text-4xl font-bold tracking-tighter text-slate-900">...</h2>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-12 gap-8">
+                <!-- Left Column: Quick Stats -->
+                <div class="col-span-4 space-y-6">
+                    <div class="minimal-card p-6">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Account Analytics</h3>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center pb-4 border-b border-slate-100">
+                                <span class="text-sm text-slate-500 font-medium">Daily Limit</span>
+                                <span class="text-sm font-bold text-slate-900">$500,000.00</span>
+                            </div>
+                            <div class="flex justify-between items-center pb-4 border-b border-slate-100">
+                                <span class="text-sm text-slate-500 font-medium">Risk Score</span>
+                                <span class="text-sm font-bold text-emerald-600">Low (0.02)</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-slate-500 font-medium">Last Audit</span>
+                                <span class="text-sm font-bold text-slate-900">12m ago</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="minimal-card p-6">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Infrastructure Control</h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button class="py-3 btn-outline text-[10px] uppercase font-bold tracking-widest">Wire</button>
+                            <button class="py-3 btn-outline text-[10px] uppercase font-bold tracking-widest">FX Trade</button>
+                            <button class="py-3 btn-outline text-[10px] uppercase font-bold tracking-widest">Invoices</button>
+                            <button class="py-3 btn-outline text-[10px] uppercase font-bold tracking-widest">Settings</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Search/Directory -->
+                <div class="col-span-8 minimal-card p-8">
+                    <div class="mb-8">
+                        <h3 class="text-lg font-bold text-slate-900">Institutional Directory</h3>
+                        <p class="text-sm text-slate-500">Query the global staff and manager database.</p>
+                    </div>
+                    
+                    <div class="flex space-x-3 mb-8">
+                        <div class="relative flex-1">
+                            <input type="text" id="searchInput" class="w-full p-3 pl-10 text-sm input-minimal" placeholder="Search by name or department...">
+                            <svg class="w-4 h-4 text-slate-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+                        <button id="searchBtn" class="px-8 btn-primary text-sm shadow-sm">Query</button>
+                    </div>
+
+                    <div id="searchResults" class="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                        <div class="text-center py-10">
+                            <p class="text-xs text-slate-400">Initialize a search to retrieve personnel records.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Lab Section -->
+        <div id="labSection" class="hidden space-y-10 animate-fade">
+            <div class="flex justify-between items-end border-b border-slate-100 pb-8">
+                <div>
+                    <h1 class="text-3xl font-bold tracking-tight text-slate-900">Security Sandbox</h1>
+                    <p class="text-slate-500 text-sm mt-1">Simulation suite for red-team testing and WAF validation.</p>
+                </div>
+                <div class="px-3 py-1 bg-slate-900 text-white rounded text-[10px] font-bold uppercase tracking-widest">
+                    Version 2.4-PRO
+                </div>
+            </div>
+
+            <div class="grid grid-cols-12 gap-10">
+                <!-- Simulation Controls -->
+                <div class="col-span-4 space-y-4">
+                    <div class="minimal-card p-6 border-l-2 border-slate-900">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Protocol Flood</h4>
+                        <p class="text-xs text-slate-500 mb-6 leading-relaxed">High-frequency distributed HTTP request simulation with header jittering.</p>
+                        <button onclick="runSimulation('dos')" class="w-full py-3 btn-outline text-xs text-slate-900 hover:border-slate-900 transition font-bold">Launch Simulation</button>
+                    </div>
+
+                    <div class="minimal-card p-6 border-l-2 border-slate-900">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Stealth Brute Force</h4>
+                        <p class="text-xs text-slate-500 mb-6 leading-relaxed">Time-jittered dictionary attack targeting authentication gateways.</p>
+                        <button onclick="runSimulation('brute')" class="w-full py-3 btn-outline text-xs text-slate-900 hover:border-slate-900 transition font-bold">Launch Simulation</button>
+                    </div>
+
+                    <div class="minimal-card p-6 border-l-2 border-slate-900">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">SQLi Evasion</h4>
+                        <p class="text-xs text-slate-500 mb-6 leading-relaxed">WAF bypass probing using obfuscated and multi-stage injection vectors.</p>
+                        <button onclick="runSimulation('sqli')" class="w-full py-3 btn-outline text-xs text-slate-900 hover:border-slate-900 transition font-bold">Launch Simulation</button>
+                    </div>
+                </div>
+
+                <!-- Simulation Output -->
+                <div class="col-span-8 flex flex-col h-[580px]">
+                    <div class="flex justify-between items-center mb-4 px-1">
+                        <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Live Intelligence Stream
+                        </h3>
+                        <button onclick="clearConsole()" class="text-[10px] font-bold text-slate-400 hover:text-slate-900 uppercase">Clear Terminal</button>
+                    </div>
+                    <div id="consoleLog" class="flex-1 console-bg p-8 text-[11px] leading-relaxed overflow-y-auto shadow-sm border border-slate-200/5">
+                        <div class="text-slate-600 italic">// Infrastructure ready. Awaiting simulation trigger...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="h-16 border-t border-slate-100 px-8 flex items-center justify-between bg-white text-[10px] font-medium text-slate-400 uppercase tracking-widest">
+        <span>&copy; 2026 Nexus Financial Systems</span>
+        <div class="flex space-x-6">
+            <span>SLA: 99.99%</span>
+            <span>Region: Global-1</span>
+        </div>
+    </footer>
+
+    <script>
+        const API_URL = 'http://localhost:5001/api';
+        
+        // Selectors
+        const loginForm = document.getElementById('loginForm');
+        const searchBtn = document.getElementById('searchBtn');
+        const loginSection = document.getElementById('loginSection');
+        const dashboardSection = document.getElementById('dashboardSection');
+        const labSection = document.getElementById('labSection');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const consoleLog = document.getElementById('consoleLog');
+        const navPersonal = document.getElementById('navPersonal');
+        const navLab = document.getElementById('navLab');
+
+        // State
+        let isLoggedIn = false;
+
+        // Navigation
+        navLab.addEventListener('click', (e) => {
+            e.preventDefault();
+            showSection('lab');
+            setActiveNav(navLab);
+        });
+
+        navPersonal.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (isLoggedIn) showSection('dashboard');
+            else showSection('login');
+            setActiveNav(navPersonal);
+        });
+
+        function showSection(id) {
+            [loginSection, dashboardSection, labSection].forEach(s => s.classList.add('hidden'));
+            document.getElementById(id + 'Section').classList.remove('hidden');
+        }
+
+        function setActiveNav(el) {
+            [navPersonal, navLab].forEach(n => {
+                n.classList.remove('text-slate-900', 'text-blue-600');
+                n.classList.add('text-slate-500');
+            });
+            el.classList.remove('text-slate-500');
+            el.classList.add('text-slate-900');
+        }
+
+        // Login
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorEl = document.getElementById('loginError');
+
+            try {
+                const res = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    isLoggedIn = true;
+                    showDashboard(data.user);
+                } else {
+                    errorEl.textContent = "Authentication Failed: Invalid Credentials";
+                    errorEl.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorEl.textContent = "Network Error: System Unreachable";
+                errorEl.classList.remove('hidden');
+            }
+        });
+
+        // Search
+        searchBtn.addEventListener('click', async () => {
+            const query = document.getElementById('searchInput').value;
+            const resultsEl = document.getElementById('searchResults');
+            resultsEl.innerHTML = '<p class="text-xs text-slate-400 animate-pulse">Consulting central database...</p>';
+
+            try {
+                const res = await fetch(`${API_URL}/users/search?name=${query}`);
+                const data = await res.json();
+
+                resultsEl.innerHTML = '';
+                if (data.length > 0) {
+                    data.forEach(user => {
+                        resultsEl.innerHTML += `
+                            <div class="p-4 bg-white border border-slate-100 rounded-lg flex justify-between items-center animate-fade">
+                                <div>
+                                    <p class="text-sm font-bold text-slate-900">${user.full_name}</p>
+                                    <p class="text-[10px] text-slate-400 font-bold uppercase mt-1">Identifier: ${user.username}</p>
+                                </div>
+                                <span class="text-[10px] px-2 py-1 bg-slate-50 text-slate-500 rounded font-bold">Authorized</span>
+                            </div>
+                        `;
+                    });
+                } else {
+                    resultsEl.innerHTML = '<p class="text-xs text-slate-400 py-10 text-center">No personnel records match your query.</p>';
+                }
+            } catch (err) {
+                resultsEl.innerHTML = '<p class="text-red-500 text-xs text-center py-10">Query Timeout: Infrastructure Error.</p>';
+            }
+        });
+
+        // Simulation
+        async function runSimulation(type) {
+            logToConsole(`>>> STARTING TASK: ${type.toUpperCase()}_ENGINE_V2`, 'header');
+            
+            try {
+                const res = await fetch(`${API_URL}/simulate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, config: { requests: 50 } })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    data.logs.forEach(line => {
+                        let style = 'info';
+                        if (line.includes('[+]')) style = 'success';
+                        else if (line.includes('[X]') || line.includes('[-]')) style = 'error';
+                        else if (line.includes('[!]')) style = 'warning';
+                        logToConsole(line, style);
+                    });
+                    logToConsole(`>>> TASK COMPLETED SUCCESSFULLY`, 'header');
+                } else {
+                    logToConsole(`>>> FATAL ERROR: ${data.error}`, 'error');
+                }
+            } catch (err) {
+                logToConsole(`>>> CONNECTION INTERRUPTED: ${err.message}`, 'error');
+            }
+        }
+
+        function logToConsole(message, type) {
+            const div = document.createElement('div');
+            div.textContent = message;
+            div.className = 'mb-1';
+            if (type === 'success') div.className += ' text-emerald-400 font-bold';
+            else if (type === 'error') div.className += ' text-rose-500 font-bold';
+            else if (type === 'warning') div.className += ' text-amber-400 font-bold';
+            else if (type === 'header') div.className += ' text-indigo-400 font-bold border-b border-slate-800 pb-1 mb-2 mt-4';
+            
+            consoleLog.appendChild(div);
+            consoleLog.scrollTop = consoleLog.scrollHeight;
+        }
+
+        function clearConsole() {
+            consoleLog.innerHTML = '<div class="text-slate-600 italic">// Console reset. System idle.</div>';
+        }
+
+        function showDashboard(user) {
+            showSection('dashboard');
+            logoutBtn.classList.remove('hidden');
+            document.getElementById('userFullName').textContent = user.full_name;
+            document.getElementById('userBalance').textContent = `$${user.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+        }
+
+        logoutBtn.addEventListener('click', () => {
+            location.reload();
+        });
+    </script>
+</body>
+</html>
